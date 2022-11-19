@@ -1,0 +1,5 @@
+<!-- <input (change)="volumeChange($event)" type="range" min="0" max="1" step="0.1" value="0.5"/> -->
+<button (click)="startRecording()">Start recording</button>
+<button (click)="stopRecording()">Stop</button>
+
+<audio *ngFor="let audio of audioFiles" controls="true" [src]="audio"></audio>
