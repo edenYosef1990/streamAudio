@@ -1,23 +1,62 @@
-export function donwloadAudioBuffer(audioBuffer: AudioBuffer) {
+
+import {saveAs as importedSaveAs} from 'file-saver';
+
+export function sliceAudioBuffer(
+  buffer: AudioBuffer,
+  audioContext: AudioContext,
+  begin: number,
+  end: number
+): AudioBuffer {
+  console.log(`start ${begin} end ${end}`);
+  var error = null;
+
+  var duration = buffer.duration;
+  var channels = buffer.numberOfChannels;
+  var rate = buffer.sampleRate;
+
+  var startOffset = rate * begin;
+  var endOffset = rate * end;
+  var frameCount = endOffset - startOffset;
+  var newArrayBuffer;
+
+  newArrayBuffer = audioContext.createBuffer(
+    channels,
+    endOffset - startOffset,
+    rate
+  );
+  var anotherArray = new Float32Array(frameCount);
+  var offset = 0;
+
+  for (var channel = 0; channel < channels; channel++) {
+    buffer.copyFromChannel(anotherArray, channel, startOffset);
+    newArrayBuffer.copyToChannel(anotherArray, channel, offset);
+  }
+
+  return newArrayBuffer;
+}
+
+export function donwloadAudioBuffer(audioBuffer: AudioBuffer, filename: string) {
   // Float32Array samples
 
+  console.log(audioBuffer.sampleRate);
   const interleaved = audioBuffer.getChannelData(0);
 
   // get WAV file bytes and audio params of your audio source
   const wavBytes = getWavBytes(interleaved.buffer, {
     isFloat: true, // floating point or 16-bit integer
-    numChannels: 2,
+    numChannels: 1,
     sampleRate: 48000,
   });
   const wav = new Blob([wavBytes], { type: 'audio/wav' });
-  let url = URL.createObjectURL(wav);
-  window.open(url);
+  importedSaveAs(wav,`${filename}.wav`);
+  //let url = URL.createObjectURL(wav);
+  //window.open(url);
 
-  console.log(wav);
+  //console.log(wav);
   // create download link and append to Dom
-  const downloadLink = document.createElement('a');
-  downloadLink.href = URL.createObjectURL(wav);
-  downloadLink.setAttribute('download', 'my-audio.wav'); // name file
+  //const downloadLink = document.createElement('a');
+  //downloadLink.href = URL.createObjectURL(wav);
+  //downloadLink.setAttribute('download', 'my-audio.wav'); // name file
 }
 
 // Returns Uint8Array of WAV bytes

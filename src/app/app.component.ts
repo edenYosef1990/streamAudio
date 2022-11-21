@@ -1,9 +1,6 @@
-import {
-  Component,
-  OnInit,
-  ChangeDetectorRef,
-} from '@angular/core';
-import { donwloadAudioBuffer } from './audio-utils';
+import {saveAs as importedSaveAs} from 'file-saver';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { donwloadAudioBuffer , sliceAudioBuffer} from './audio-utils';
 import { DomSanitizer } from '@angular/platform-browser';
 
 declare var MediaRecorder: any;
@@ -18,6 +15,9 @@ export class AppComponent implements OnInit {
   chunks: Blob[] = [];
   audioFiles = [];
   link: string = '';
+  filenameCounter = 0;
+
+  firstBlob: Blob | null = null;
 
   constructor(private cd: ChangeDetectorRef, private dom: DomSanitizer) {}
 
@@ -34,83 +34,49 @@ export class AppComponent implements OnInit {
       throw new Error('media recorder not initalized!');
     this.mediaRecorder.start(1000);
     this.mediaRecorder.addEventListener('dataavailable', (event: BlobEvent) => {
+      if (this.firstBlob === null) {
+        this.firstBlob = event.data;
+        return;
+      }
+      this.handleDataAvailable(event.data);
       this.chunks.push(event.data);
     });
     console.log('recorder started');
   }
 
-  // Convert an AudioBuffer to a Blob using WAVE representation
-  sliceAudioBuffer(
-    buffer: AudioBuffer,
-    audioContext: AudioContext,
-    begin: number,
-    end: number
-  ): AudioBuffer {
-	  console.log(`start ${begin} end ${end}`);
-    var error = null;
-
-    var duration = buffer.duration;
-    var channels = buffer.numberOfChannels;
-    var rate = buffer.sampleRate;
-
-    // milliseconds to seconds
-    //begin = begin / 1000;
-    //end = end / 1000;
-
-    var startOffset = rate * begin;
-    var endOffset = rate * end;
-    var frameCount = endOffset - startOffset;
-    var newArrayBuffer;
-
-    newArrayBuffer = audioContext.createBuffer(
-      channels,
-      endOffset - startOffset,
-      rate
-    );
-    var anotherArray = new Float32Array(frameCount);
-    var offset = 0;
-
-    for (var channel = 0; channel < channels; channel++) {
-      buffer.copyFromChannel(anotherArray, channel, startOffset);
-      newArrayBuffer.copyToChannel(anotherArray, channel, offset);
-    }
-
-    return newArrayBuffer;
+  handleDataAvailable(inputBlob: Blob) {
+    if (this.mediaRecorder === null)
+      throw new Error('media recorder not initalized!');
+    if (this.firstBlob === null)
+      throw new Error('not blob containing header found!');
+    let chunks = [this.firstBlob, inputBlob];
+    let blob = new Blob(chunks, { type: 'audio/ogg; codecs=opus' });
+    let file = new File([blob], 'bla.webm');
+    this.downloadLastSecondFromAudioFile(file,`audio${this.filenameCounter++}`);
   }
 
-  async sliceLastSecondFromAudioFile(file: File) {
+  async downloadLastSecondFromAudioFile(file: File, filename: string) {
     const arrayBuffer = await file.arrayBuffer();
-    const audioCtx = new AudioContext();
+    const audioCtx = new window.AudioContext();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
     const startOffset = audioBuffer.duration - 1;
     const endOffset = audioBuffer.duration;
 
-    let sliced = this.sliceAudioBuffer(
+    let sliced = sliceAudioBuffer(
       audioBuffer,
       audioCtx,
       startOffset,
       endOffset
     );
-    
-    //let wav = audioBufferToWav(audioBuffer);
-    //let blob= new Blob([new DataView(wav) ],{type: 'audio/wav'});
-    //let url = URL.createObjectURL(blob);
-    //window.open(url);
-    //donwloadAudioBuffer(sliced);
+
+    donwloadAudioBuffer(sliced,filename);
   }
   stopRecording() {
     if (this.mediaRecorder === null)
       throw new Error('media recorder not initalized!');
-    //this.mediaRecorder.stop();
     this.mediaRecorder.stop();
-    console.log(this.chunks.length);
-    this.chunks.slice(2,1);
-    let blob = new Blob(this.chunks, { type: 'audio/ogg; codecs=opus' });
-    let file = new File([blob], 'bla.webm');
-    let url = URL.createObjectURL(blob);
-    window.open(url);
-    //let slicedLastSec = this.sliceLastSecondFromAudioFile(file);
-    //console.log('recorder stopped');
+    this.firstBlob = null;
+    this.filenameCounter = 0;
   }
 }
